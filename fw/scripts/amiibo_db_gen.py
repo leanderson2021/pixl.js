@@ -37,7 +37,7 @@ def get_prorject_directory():
 
 def fetch_amiibo_from_api():
     try:
-        conn = urlopen("https://www.amiiboapi.com/api/amiibo/", timeout=5000)
+        conn = urlopen("https://amiiboapi.org/api/amiibo", timeout=5000)
         body = json.loads(conn.read())
         amiibos = list()
         for ami in body["amiibo"]: 
@@ -70,14 +70,24 @@ def read_amiibo_from_csv():
 
 def write_amiibo_to_csv(amiibos):
     csv_file = get_prorject_directory() + "/data/amiidb_amiibo.csv"
-    with open(csv_file, "w", encoding="utf8", newline="") as f:
-        w = csv.writer(f)
-        for amiibo in amiibos:
-            r = list()
-            r.append(amiibo.id)
-            r.append(amiibo.name_en)
-            r.append(amiibo.name_cn)
-            w.writerow(r)
+    existing_ids = set()
+
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf8", newline="") as f:
+            for row in csv.reader(f):
+                if row:
+                    existing_ids.add(row[0])
+
+    new_amiibos = [a for a in amiibos if a.id not in existing_ids]
+    if not new_amiibos:
+        return
+
+    with open(csv_file, "a", encoding="utf8", newline="") as f:
+        writer = csv.writer(f, lineterminator="\\n")
+        for amiibo in new_amiibos:
+            writer.writerow([
+                amiibo.id, amiibo.name_en, amiibo.name_cn or ""
+            ])
 
 
 def merge_amiibo(amiibos_csv, amiibos_api):
@@ -101,9 +111,9 @@ def gen_amiibo_data_c_file(amiibos):
         f.write('#include "db_header.h"\n')
         f.write('const db_amiibo_t amiibo_list[] = {\n')
         for amiibo in amiibos:
-            f.write('{0x%s, 0x%s, "%s", "%s"}, \n' % 
+            f.write('{0x%s, 0x%s, "%s", "%s"},\n' %
                     (amiibo.id[0:8], amiibo.id[8:16], amiibo.name_en, 
-             amiibo.name_cn)) 
+                     amiibo.name_cn or ""))
         f.write("{0, 0, 0, 0}\n")
         f.write("};\n")
         f.write("// Subsctracting one because of the end-marker entry {0,0,0,0} at the end.\n")
@@ -164,7 +174,7 @@ def gen_amiibo_link_c_file(links):
         f.write('#include "db_header.h"\n')
         f.write('const db_link_t link_list[] = {\n')
         for link in links:
-            f.write('{%s, 0x%s, 0x%s, "%s", "%s", "%s"}, \n' % 
+            f.write('{%s, 0x%s, 0x%s, "%s", "%s", "%s"},\n' %
                     (link.game_id, link.amiibo_id[0:8], link.amiibo_id[8:16], link.note_en, 
              link.note_cn, link.note_it))  
         f.write("{0, 0, 0, 0, 0, 0}\n")
@@ -177,7 +187,7 @@ def gen_amiibo_game_c_file(games, links):
         f.write('#include "db_header.h"\n')
         f.write('const db_game_t game_list[] = {\n')
         for game in games:
-            f.write('{%s, %s, "%s", "%s", %s, %s}, \n' % 
+            f.write('{%s, %s, "%s", "%s", %s, %s},\n' %
                     (game.id, game.parent_id, game.name_en, 
              game.name_cn, game.order, count_game_links( games, links, game.id)))
         f.write("{0, 0, 0, 0, 0}\n")
@@ -208,8 +218,8 @@ def gen_other_link(amiibos, links):
 amiibos_api = fetch_amiibo_from_api()
 amiibos_csv = read_amiibo_from_csv()
 amiibos_merged = merge_amiibo(amiibos_csv, amiibos_api)
+amiibos_merged.sort(key=lambda a: (int(a.id[:8], 16), int(a.id[8:16], 16)))
 write_amiibo_to_csv(amiibos_merged)
-amiibos_merged.sort(key=lambda x: x.id)
 print("Found %d amiibo records." % len(amiibos_merged))
 gen_amiibo_data_c_file(amiibos_merged)
 
