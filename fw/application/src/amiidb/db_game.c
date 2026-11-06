@@ -84,5 +84,6 @@ const db_game_t game_list[] = {
 {80, 0, "Super Mario Bros. Wonder", "", 1, 3},
 {81, 0, "Super Mario Galaxy + Super Mario Galaxy 2", "", 1, 2},
 {82, 0, "My Mario Wooden Blocks", "", 1, 2},
+{83, 0, "The Legend of Zelda: Ocarina of Time", "塞尔达传说 时之笛", 15, 2},
 {0, 0, 0, 0, 0}
 };
